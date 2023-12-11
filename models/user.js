@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 
 const db = require("../db");
 const ExpressError = require("../expressError");
+const { BCRYPT_WORK_FACTOR } = require('../config');
 
 /** User of the site. */
 
@@ -13,7 +14,7 @@ class User {
    */
 
   static async register({username, password, first_name, last_name, phone}) {
-    let hashedPW = await bcrypt.hash(password, 12); 
+    let hashedPW = await bcrypt.hash(password, BCRYPT_WORK_FACTOR); 
     const result = await db.query(`
     INSERT INTO users (
       username,
@@ -21,8 +22,9 @@ class User {
       first_name,
       last_name,
       phone,
-      join_at)
-      VALUES ($1, $2, $3, $4, $5, current_timestamp)
+      join_at,
+      last_login_at)
+      VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
       RETURNING (username, password, first_name, last_name)`,
       [username, hashedPW, first_name, last_name, phone]);
     return result.rows[0];
@@ -63,8 +65,9 @@ class User {
 
   static async all() { 
     const result = await db.query(`
-    SELECT * FROM users
-    RETURNING username, first_name, last_name, phone`);
+    SELECT username, first_name, last_name, phone
+    FROM users
+    ORDER BY username`);
     return result.rows;
   }
 
@@ -79,9 +82,9 @@ class User {
 
   static async get(username) { 
     const result = await db.query(`
-    SELECT * FROM users
-    WHERE username = $1
-    RETURNING username, first_name, last_name, phone, join_at, last_login_at`,
+    SELECT username, first_name, last_name, phone, join_at, last_login_at
+    FROM users
+    WHERE username = $1`,
     [username]);
     if (result.rows[0] == undefined){
       throw new ExpressError(`user ${username} not found`,404);
